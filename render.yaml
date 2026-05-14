@@ -1,0 +1,14 @@
+# render.yaml — cấu hình deploy tự động cho Render
+# Khi import repo, Render sẽ đọc file này và tạo service sẵn.
+services:
+  - type: web
+    name: tro-ly-tin-hoc-10
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false   # Bạn tự nhập giá trị trong dashboard, không lưu vào git
+      - key: PYTHON_VERSION
+        value: 3.11.9
