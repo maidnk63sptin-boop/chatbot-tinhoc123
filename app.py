@@ -3,22 +3,24 @@ app.py
 ------------------------------------------------------------
 Trợ lý AI Tin học 10 (RAG) - phiên bản tối ưu để deploy lên Render.
 
-Khác biệt chính so với bản cũ:
-- KHÔNG đọc file .docx/.pdf lúc khởi động. Thay vào đó NẠP SẴN
-  FAISS index đã build từ trước (thư mục faiss_index/).
+Dùng thư viện Google GenAI MỚI (google-genai). Chỉ dùng:
+  - google-genai : cho cả chat lẫn embedding
+  - faiss        : đọc index đã build sẵn
+
+Đặc điểm:
+- Nạp sẵn FAISS index đã build từ trước (thư mục faiss_index/).
 - Đường dẫn tuyệt đối -> không lỗi "file not found" trên server.
-- Bọc try/except quanh phần khởi tạo -> app không crash, chỉ
-  hiện cảnh báo nếu thiếu gì đó.
-- Không lưu object chat của SDK vào session_state (dễ lỗi khi
-  Render restart). Thay vào đó tự quản lý history dạng list.
+- Bọc try/except -> app không crash, chỉ cảnh báo nếu thiếu gì.
 ------------------------------------------------------------
 """
 import os
+import pickle
 
+import numpy as np
+import faiss
 import streamlit as st
-import google.generativeai as genai
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_community.vectorstores import FAISS
+from google import genai
+from google.genai import types
 
 # ============================================================
 # 0. CẤU HÌNH TRANG
@@ -27,6 +29,11 @@ st.set_page_config(page_title="Trợ lý AI Tin học 10", page_icon="🤖")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INDEX_DIR = os.path.join(BASE_DIR, "faiss_index")
+INDEX_FILE = os.path.join(INDEX_DIR, "index.faiss")
+CHUNKS_FILE = os.path.join(INDEX_DIR, "chunks.pkl")
+
+EMBED_MODEL = "gemini-embedding-001"
+CHAT_MODEL = "gemini-2.5-flash-lite"
 
 # ============================================================
 # 1. API KEY
@@ -40,7 +47,7 @@ if not api_key:
     )
     st.stop()
 
-genai.configure(api_key=api_key)
+client = genai.Client(api_key=api_key)
 
 SYSTEM_INSTRUCTION = """Bạn là một chuyên gia giáo dục và là trợ lý ảo dành riêng cho giáo viên giảng dạy môn Tin học lớp 10 tại Việt Nam, bám sát chương trình Giáo dục phổ thông 2018 (SGK Kết nối tri thức với cuộc sống và Cánh diều).
 
@@ -58,56 +65,66 @@ QUY TẮC BẮT BUỘC:
 
 
 # ============================================================
-# 2. NẠP MODEL VÀ FAISS INDEX (có cache)
+# 2. NẠP FAISS INDEX (có cache)
 # ============================================================
 @st.cache_resource(show_spinner=False)
-def load_model():
-    return genai.GenerativeModel(
-        "gemini-2.5-flash-lite",
-        system_instruction=SYSTEM_INSTRUCTION,
-    )
-
-
-@st.cache_resource(show_spinner=False)
-def load_vector_store():
-    """Nạp FAISS index đã build sẵn. Trả về None nếu chưa có index."""
-    if not os.path.isdir(INDEX_DIR):
-        return None
+def load_index():
+    """
+    Nạp FAISS index + danh sách đoạn văn bản đã build sẵn.
+    Trả về (index, chunks) hoặc (None, None) nếu chưa có.
+    """
+    if not (os.path.exists(INDEX_FILE) and os.path.exists(CHUNKS_FILE)):
+        return None, None
     try:
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-001", google_api_key=api_key
-        )
-        # allow_dangerous_deserialization=True: bắt buộc với FAISS bản mới
-        # khi nạp index do chính mình tạo ra.
-        return FAISS.load_local(
-            INDEX_DIR,
-            embeddings,
-            allow_dangerous_deserialization=True,
-        )
+        index = faiss.read_index(INDEX_FILE)
+        with open(CHUNKS_FILE, "rb") as f:
+            chunks = pickle.load(f)
+        return index, chunks
     except Exception as e:
         st.warning(f"⚠️ Không nạp được FAISS index: {e}")
-        return None
+        return None, None
 
-
-model = load_model()
 
 with st.spinner("Đang nạp dữ liệu tài liệu (RAG)..."):
-    vector_store = load_vector_store()
+    faiss_index, doc_chunks = load_index()
 
-if vector_store is None:
+if faiss_index is None:
     st.warning(
-        "⚠️ Chưa có dữ liệu RAG (thư mục `faiss_index/` không tồn tại). "
+        "⚠️ Chưa có dữ liệu RAG (thiếu thư mục `faiss_index/`). "
         "App vẫn chạy được nhưng chỉ dùng kiến thức chung của AI. "
         "Hãy chạy `build_index.py` và commit thư mục `faiss_index/`."
     )
 
 
+def search_context(query: str, k: int = 4) -> str:
+    """Tìm k đoạn tài liệu liên quan nhất tới câu hỏi."""
+    if faiss_index is None:
+        return ""
+    try:
+        result = client.models.embed_content(
+            model=EMBED_MODEL,
+            contents=query,
+            config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
+        )
+        q_vec = np.array([result.embeddings[0].values], dtype="float32")
+        distances, indices = faiss_index.search(q_vec, k)
+        parts = []
+        for idx in indices[0]:
+            if 0 <= idx < len(doc_chunks):
+                parts.append(
+                    f"--- Trích đoạn tài liệu ---\n{doc_chunks[idx]}"
+                )
+        return "\n\n".join(parts)
+    except Exception as e:
+        st.warning(f"⚠️ Lỗi tìm kiếm RAG: {e}")
+        return ""
+
+
 # ============================================================
 # 3. QUẢN LÝ TRẠNG THÁI SESSION
 # ============================================================
-# Mỗi cuộc trò chuyện chỉ lưu 1 list các message dạng:
+# Mỗi cuộc trò chuyện là 1 list message dạng:
 #   {"role": "user"|"assistant", "content": "..."}
-# KHÔNG lưu object chat của SDK -> ổn định hơn.
 if "all_chats" not in st.session_state:
     st.session_state.all_chats = {"Cuộc trò chuyện 1": []}
 
@@ -160,20 +177,9 @@ for msg in history:
 
 def build_augmented_prompt(user_prompt: str) -> str:
     """Tìm ngữ cảnh từ FAISS và ghép vào prompt."""
-    if vector_store is None:
+    context_text = search_context(user_prompt, k=4)
+    if not context_text:
         return user_prompt
-    try:
-        docs = vector_store.similarity_search(user_prompt, k=4)
-    except Exception as e:
-        st.warning(f"⚠️ Lỗi tìm kiếm RAG: {e}")
-        return user_prompt
-
-    if not docs:
-        return user_prompt
-
-    context_text = "\n\n".join(
-        f"--- Trích đoạn tài liệu ---\n{d.page_content}" for d in docs
-    )
     return f"""Dựa vào các THÔNG TIN TỪ TÀI LIỆU DƯỚI ĐÂY để trả lời câu hỏi của người dùng.
 Nếu thông tin tài liệu không đủ, hãy dựa vào kiến thức của bạn.
 
@@ -187,18 +193,27 @@ Nếu thông tin tài liệu không đủ, hãy dựa vào kiến thức của b
 
 def call_gemini(history_msgs, augmented_prompt):
     """
-    Gọi Gemini với toàn bộ lịch sử. Lịch sử được dựng lại mỗi lần
-    từ list message -> không phụ thuộc object chat đã lưu.
-    Tin nhắn cuối (user) được thay bằng augmented_prompt.
+    Gọi Gemini với toàn bộ lịch sử (SDK mới).
+    Lịch sử được dựng lại mỗi lần từ list message.
+    Tin nhắn user cuối được thay bằng augmented_prompt.
     """
     contents = []
     for m in history_msgs[:-1]:  # tất cả trừ tin nhắn user cuối cùng
         role = "user" if m["role"] == "user" else "model"
-        contents.append({"role": role, "parts": [m["content"]]})
-    # tin nhắn user cuối -> dùng prompt đã tăng cường
-    contents.append({"role": "user", "parts": [augmented_prompt]})
+        contents.append(
+            types.Content(role=role, parts=[types.Part(text=m["content"])])
+        )
+    contents.append(
+        types.Content(role="user", parts=[types.Part(text=augmented_prompt)])
+    )
 
-    response = model.generate_content(contents)
+    response = client.models.generate_content(
+        model=CHAT_MODEL,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTION
+        ),
+    )
     return response.text
 
 
