@@ -75,7 +75,7 @@ def load_vector_store():
         return None
     try:
         embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001", google_api_key=api_key
+            model="models/gemini-embedding-001", google_api_key=api_key
         )
         # allow_dangerous_deserialization=True: bắt buộc với FAISS bản mới
         # khi nạp index do chính mình tạo ra.
