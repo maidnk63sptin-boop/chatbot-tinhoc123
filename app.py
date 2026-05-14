@@ -59,7 +59,6 @@ def setup_rag_system():
         return text
 
     # Đọc các file dữ liệu (Cần đảm bảo file nằm cùng thư mục với script)
-    # Lưu ý: File .doc đã được giả định chuyển thành .docx
     text_data += read_docx("Miền nhận thức.docx")
     text_data += read_docx("Kế hoạch bài dạy_Công văn 5512.docx") 
     text_data += read_pdf("TIN HỌC 10 KNTT.pdf")
