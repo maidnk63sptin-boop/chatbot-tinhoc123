@@ -1,22 +1,48 @@
+"""
+app.py
+------------------------------------------------------------
+Trợ lý AI Tin học 10 (RAG) - phiên bản tối ưu để deploy lên Render.
+
+Khác biệt chính so với bản cũ:
+- KHÔNG đọc file .docx/.pdf lúc khởi động. Thay vào đó NẠP SẴN
+  FAISS index đã build từ trước (thư mục faiss_index/).
+- Đường dẫn tuyệt đối -> không lỗi "file not found" trên server.
+- Bọc try/except quanh phần khởi tạo -> app không crash, chỉ
+  hiện cảnh báo nếu thiếu gì đó.
+- Không lưu object chat của SDK vào session_state (dễ lỗi khi
+  Render restart). Thay vào đó tự quản lý history dạng list.
+------------------------------------------------------------
+"""
 import os
+
 import streamlit as st
 import google.generativeai as genai
-import PyPDF2
-import docx
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import FAISS
 
-# --- 1. CẤU HÌNH API VÀ MODEL ---
-api_key = os.getenv("GEMINI_API_KEY")
+# ============================================================
+# 0. CẤU HÌNH TRANG
+# ============================================================
+st.set_page_config(page_title="Trợ lý AI Tin học 10", page_icon="🤖")
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+INDEX_DIR = os.path.join(BASE_DIR, "faiss_index")
+
+# ============================================================
+# 1. API KEY
+# ============================================================
+api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
-    st.error("❌ Không tìm thấy GEMINI_API_KEY. Vui lòng kiểm tra lại file .env hoặc biến môi trường!")
+    st.error(
+        "❌ Không tìm thấy GEMINI_API_KEY.\n\n"
+        "Trên Render: vào tab **Environment** thêm biến này.\n"
+        "Ở máy local: đặt biến môi trường hoặc dùng file .env."
+    )
     st.stop()
 
-genai.configure(api_key=api_key) 
+genai.configure(api_key=api_key)
 
-instruction = """Bạn là một chuyên gia giáo dục và là trợ lý ảo dành riêng cho giáo viên giảng dạy môn Tin học lớp 10 tại Việt Nam, bám sát chương trình Giáo dục phổ thông 2018 (SGK Kết nối tri thức với cuộc sống và Cánh diều).
+SYSTEM_INSTRUCTION = """Bạn là một chuyên gia giáo dục và là trợ lý ảo dành riêng cho giáo viên giảng dạy môn Tin học lớp 10 tại Việt Nam, bám sát chương trình Giáo dục phổ thông 2018 (SGK Kết nối tri thức với cuộc sống và Cánh diều).
 
 Nhiệm vụ của bạn:
 1. Hỗ trợ soạn giáo án.
@@ -30,133 +56,170 @@ QUY TẮC BẮT BUỘC:
 - Nếu câu hỏi không liên quan, hãy từ chối trả lời và thông báo: "Tôi chỉ hỗ trợ các nội dung thuộc Tin học lớp 10."
 """
 
-model = genai.GenerativeModel('gemini-2.5-flash-lite', system_instruction=instruction)
 
-# --- 2. HÀM XỬ LÝ DỮ LIỆU RAG (ĐƯỢC CACHE ĐỂ CHẠY NHANH) ---
-@st.cache_resource
-def setup_rag_system():
-    text_data = ""
-    
-    # Hàm phụ để đọc file docx
-    def read_docx(file_path):
-        try:
-            doc = docx.Document(file_path)
-            return "\n".join([para.text for para in doc.paragraphs]) + "\n"
-        except Exception as e:
-            print(f"Lỗi đọc {file_path}: {e}")
-            return ""
+# ============================================================
+# 2. NẠP MODEL VÀ FAISS INDEX (có cache)
+# ============================================================
+@st.cache_resource(show_spinner=False)
+def load_model():
+    return genai.GenerativeModel(
+        "gemini-2.5-flash-lite",
+        system_instruction=SYSTEM_INSTRUCTION,
+    )
 
-    # Hàm phụ để đọc file pdf
-    def read_pdf(file_path):
-        text = ""
-        try:
-            with open(file_path, "rb") as f:
-                reader = PyPDF2.PdfReader(f)
-                for page in reader.pages:
-                    text += page.extract_text() + "\n"
-        except Exception as e:
-            print(f"Lỗi đọc {file_path}: {e}")
-        return text
 
-    # Đọc các file dữ liệu (Cần đảm bảo file nằm cùng thư mục với script)
-    text_data += read_docx("Miền nhận thức.docx")
-    text_data += read_docx("Kế hoạch bài dạy_Công văn 5512.docx") 
-    text_data += read_pdf("TIN HỌC 10 KNTT.pdf")
+@st.cache_resource(show_spinner=False)
+def load_vector_store():
+    """Nạp FAISS index đã build sẵn. Trả về None nếu chưa có index."""
+    if not os.path.isdir(INDEX_DIR):
+        return None
+    try:
+        embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001", google_api_key=api_key
+        )
+        # allow_dangerous_deserialization=True: bắt buộc với FAISS bản mới
+        # khi nạp index do chính mình tạo ra.
+        return FAISS.load_local(
+            INDEX_DIR,
+            embeddings,
+            allow_dangerous_deserialization=True,
+        )
+    except Exception as e:
+        st.warning(f"⚠️ Không nạp được FAISS index: {e}")
+        return None
 
-    if not text_data.strip():
-        return None # Không có dữ liệu
 
-    # Chia nhỏ văn bản (Chunking)
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=300)
-    chunks = text_splitter.split_text(text_data)
-    
-    # Tạo Vector Store (Sử dụng Embedding của Google)
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
-    vector_store = FAISS.from_texts(chunks, embeddings)
-    
-    return vector_store
+model = load_model()
 
-# Khởi tạo Vector Store
-with st.spinner("Đang tải dữ liệu tài liệu (RAG)... Vui lòng đợi trong giây lát."):
-    vector_store = setup_rag_system()
+with st.spinner("Đang nạp dữ liệu tài liệu (RAG)..."):
+    vector_store = load_vector_store()
 
-# --- 3. QUẢN LÝ TRẠNG THÁI SESSION ---
+if vector_store is None:
+    st.warning(
+        "⚠️ Chưa có dữ liệu RAG (thư mục `faiss_index/` không tồn tại). "
+        "App vẫn chạy được nhưng chỉ dùng kiến thức chung của AI. "
+        "Hãy chạy `build_index.py` và commit thư mục `faiss_index/`."
+    )
+
+
+# ============================================================
+# 3. QUẢN LÝ TRẠNG THÁI SESSION
+# ============================================================
+# Mỗi cuộc trò chuyện chỉ lưu 1 list các message dạng:
+#   {"role": "user"|"assistant", "content": "..."}
+# KHÔNG lưu object chat của SDK -> ổn định hơn.
 if "all_chats" not in st.session_state:
-    st.session_state.all_chats = {"Cuộc trò chuyện 1": model.start_chat(history=[])}
+    st.session_state.all_chats = {"Cuộc trò chuyện 1": []}
 
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = "Cuộc trò chuyện 1"
 
-# Hiển thị lịch sử chat cho UI (Tách biệt lịch sử hiển thị và lịch sử API nếu cần)
-if "chat_display_history" not in st.session_state:
-    st.session_state.chat_display_history = {"Cuộc trò chuyện 1": []}
 
-# --- 4. GIAO DIỆN SIDEBAR ---
+def get_history():
+    return st.session_state.all_chats[st.session_state.current_chat]
+
+
+# ============================================================
+# 4. SIDEBAR
+# ============================================================
 with st.sidebar:
     st.title("📁 Quản lý trò chuyện")
-    
+
     if st.button("➕ Cuộc trò chuyện mới", use_container_width=True):
-        new_chat_name = f"Cuộc trò chuyện {len(st.session_state.all_chats) + 1}"
-        st.session_state.all_chats[new_chat_name] = model.start_chat(history=[])
-        st.session_state.chat_display_history[new_chat_name] = []
-        st.session_state.current_chat = new_chat_name
+        idx = len(st.session_state.all_chats) + 1
+        new_name = f"Cuộc trò chuyện {idx}"
+        st.session_state.all_chats[new_name] = []
+        st.session_state.current_chat = new_name
         st.rerun()
 
     st.divider()
     st.write("🕒 *Lịch sử trò chuyện:*")
-    
-    for chat_name in st.session_state.all_chats.keys():
-        is_active = (chat_name == st.session_state.current_chat)
-        if st.button(chat_name, disabled=is_active, use_container_width=True):
+
+    for chat_name in list(st.session_state.all_chats.keys()):
+        is_active = chat_name == st.session_state.current_chat
+        if st.button(
+            chat_name, disabled=is_active, use_container_width=True
+        ):
             st.session_state.current_chat = chat_name
             st.rerun()
 
-# --- 5. KHU VỰC GIAO DIỆN CHÍNH ---
+
+# ============================================================
+# 5. GIAO DIỆN CHÍNH
+# ============================================================
 st.title("🤖 Trợ lý AI Tin học 10 (Hỗ trợ RAG)")
 st.caption(f"Đang hiển thị: {st.session_state.current_chat}")
 
-active_chat = st.session_state.all_chats[st.session_state.current_chat]
-display_history = st.session_state.chat_display_history[st.session_state.current_chat]
+history = get_history()
 
-# Hiển thị lịch sử tin nhắn trên UI
-for msg in display_history:
+# Hiển thị lịch sử
+for msg in history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Xử lý khi nhập câu hỏi mới
+
+def build_augmented_prompt(user_prompt: str) -> str:
+    """Tìm ngữ cảnh từ FAISS và ghép vào prompt."""
+    if vector_store is None:
+        return user_prompt
+    try:
+        docs = vector_store.similarity_search(user_prompt, k=4)
+    except Exception as e:
+        st.warning(f"⚠️ Lỗi tìm kiếm RAG: {e}")
+        return user_prompt
+
+    if not docs:
+        return user_prompt
+
+    context_text = "\n\n".join(
+        f"--- Trích đoạn tài liệu ---\n{d.page_content}" for d in docs
+    )
+    return f"""Dựa vào các THÔNG TIN TỪ TÀI LIỆU DƯỚI ĐÂY để trả lời câu hỏi của người dùng.
+Nếu thông tin tài liệu không đủ, hãy dựa vào kiến thức của bạn.
+
+[THÔNG TIN TỪ TÀI LIỆU (Giáo án, SGK Tin 10, Thang đo Bloom)]:
+{context_text}
+
+[CÂU HỎI CỦA NGƯỜI DÙNG]:
+{user_prompt}
+"""
+
+
+def call_gemini(history_msgs, augmented_prompt):
+    """
+    Gọi Gemini với toàn bộ lịch sử. Lịch sử được dựng lại mỗi lần
+    từ list message -> không phụ thuộc object chat đã lưu.
+    Tin nhắn cuối (user) được thay bằng augmented_prompt.
+    """
+    contents = []
+    for m in history_msgs[:-1]:  # tất cả trừ tin nhắn user cuối cùng
+        role = "user" if m["role"] == "user" else "model"
+        contents.append({"role": role, "parts": [m["content"]]})
+    # tin nhắn user cuối -> dùng prompt đã tăng cường
+    contents.append({"role": "user", "parts": [augmented_prompt]})
+
+    response = model.generate_content(contents)
+    return response.text
+
+
+# Xử lý input mới
 if prompt := st.chat_input("Hỏi về giáo án, bài tập, SGK..."):
-    # 1. Hiển thị tin nhắn người dùng
+    # 1. Hiển thị + lưu tin nhắn người dùng
     with st.chat_message("user"):
         st.markdown(prompt)
-    display_history.append({"role": "user", "content": prompt})
+    history.append({"role": "user", "content": prompt})
 
-    # 2. Tìm kiếm ngữ cảnh (RAG Retrieval)
-    context_text = ""
-    if vector_store:
-        # Lấy 3 đoạn văn bản liên quan nhất từ các file
-        docs = vector_store.similarity_search(prompt, k=4)
-        context_text = "\n\n".join([f"--- Trích đoạn tài liệu ---\n{doc.page_content}" for doc in docs])
+    # 2. Tạo prompt tăng cường (RAG)
+    augmented_prompt = build_augmented_prompt(prompt)
 
-    # 3. Tạo Prompt tăng cường (Augmented Prompt)
-    if context_text:
-        augmented_prompt = f"""Dựa vào các THÔNG TIN TỪ TÀI LIỆU DƯỚI ĐÂY để trả lời câu hỏi của người dùng. 
-        Nếu thông tin tài liệu không đủ, hãy dựa vào kiến thức của bạn.
-        
-        [THÔNG TIN TỪ TÀI LIỆU (Giáo án, SGK Tin 10 CD, Thang đo Bloom)]:
-        {context_text}
-        
-        [CÂU HỎI CỦA NGƯỜI DÙNG]: 
-        {prompt}
-        """
-    else:
-        augmented_prompt = prompt
-
-    # 4. Gửi đến AI
+    # 3. Gọi AI
     with st.chat_message("assistant"):
         with st.spinner("Đang suy nghĩ và tra cứu tài liệu..."):
-            # Gửi tin nhắn chứa ngữ cảnh cho API
-            response = active_chat.send_message(augmented_prompt)
-            st.markdown(response.text)
-            
-    # Lưu tin nhắn phản hồi vào lịch sử hiển thị
-    display_history.append({"role": "assistant", "content": response.text})
+            try:
+                answer = call_gemini(history, augmented_prompt)
+            except Exception as e:
+                answer = f"❌ Lỗi khi gọi AI: {e}"
+            st.markdown(answer)
+
+    # 4. Lưu phản hồi
+    history.append({"role": "assistant", "content": answer})
