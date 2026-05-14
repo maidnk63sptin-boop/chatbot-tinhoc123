@@ -7,3 +7,4 @@ langchain-community==0.2.16
 langchain-google-genai==1.0.10
 faiss-cpu==1.8.0.post1
 tiktoken==0.7.0
+urllib3==1.26.18
