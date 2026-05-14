@@ -1,7 +1,7 @@
 streamlit>=1.40
-langchain>=0.3
-langchain-community>=0.3
-langchain-google-genai>=2.1
+google-genai>=1.0
+langchain-text-splitters>=0.3
 faiss-cpu
 pypdf
 python-docx
+numpy
