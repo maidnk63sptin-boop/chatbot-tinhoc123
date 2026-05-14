@@ -1,7 +1,7 @@
 streamlit
 google-generativeai
 PyPDF2
-python-docx
+python-docx==1.1.2
 langchain
 langchain-google-genai
 langchain-community
