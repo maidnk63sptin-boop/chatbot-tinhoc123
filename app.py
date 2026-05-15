@@ -174,6 +174,25 @@ for msg in history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+# Nhập tin nhắn
+prompt = st.chat_input("Nhập câu hỏi của bạn...")
+
+if prompt:
+  # LƯU USER MESSAGE
+  history.append({
+    "role": "user",
+        "content": prompt
+    })
+# RESPONSE DEMO
+response = f"Bạn vừa hỏi: {prompt}"
+ # LƯU ASSISTANT MESSAGE
+ history.append({
+        "role": "assistant",
+        "content": response
+    })
+ # Hiển thị assistant message
+    with st.chat_message("assistant"):
+        st.markdown(response)
 
 def build_augmented_prompt(user_prompt: str) -> str:
     """Tìm ngữ cảnh từ FAISS và ghép vào prompt."""
