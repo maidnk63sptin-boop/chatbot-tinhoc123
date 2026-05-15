@@ -178,7 +178,7 @@ for msg in history:
 prompt = st.chat_input("Nhập câu hỏi của bạn...")
 
 if prompt:
-     # LƯU USER MESSAGE
+    # LƯU USER MESSAGE
     history.append({
         "role": "user",
         "content": prompt
