@@ -173,6 +173,9 @@ history = get_history()
 for msg in history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+      
+# Nhập tin nhắn
+prompt = st.chat_input("Nhập câu hỏi của bạn...")
 
 if prompt:
     # LƯU USER MESSAGE
