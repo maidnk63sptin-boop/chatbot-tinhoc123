@@ -178,19 +178,24 @@ for msg in history:
 prompt = st.chat_input("Nhập câu hỏi của bạn...")
 
 if prompt:
-  # LƯU USER MESSAGE
-  history.append({
-    "role": "user",
+     # LƯU USER MESSAGE
+    history.append({
+        "role": "user",
         "content": prompt
     })
-# RESPONSE DEMO
-response = f"Bạn vừa hỏi: {prompt}"
- # LƯU ASSISTANT MESSAGE
- history.append({
+
+    # Hiển thị user message
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    # RESPONSE DEMO
+    response = f"Bạn vừa hỏi: {prompt}"
+    # LƯU ASSISTANT MESSAGE
+    history.append({
         "role": "assistant",
         "content": response
     })
- # Hiển thị assistant message
+
+    # Hiển thị assistant message
     with st.chat_message("assistant"):
         st.markdown(response)
 
