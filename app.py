@@ -174,7 +174,7 @@ for msg in history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-prompt = st.chat_input("Hỏi về giáo án, bài tập, SGK...")
+prompt = st.chat_input("Hãy nhập câu hỏi...")
 if prompt:
     # LƯU USER MESSAGE
     history.append({
