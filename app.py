@@ -22,6 +22,7 @@ QUY TẮC BẮT BUỘC:
 - Chỉ trả lời các câu hỏi liên quan đến môn Tin học lớp 10.
 - Nếu câu hỏi không liên quan, hãy từ chối trả lời và thông báo: "Tôi chỉ hỗ trợ các nội dung thuộc Tin học lớp 10."
 """
+
 # 4. Cấu hình API Key
 genai.configure(api_key=api_key) 
 
