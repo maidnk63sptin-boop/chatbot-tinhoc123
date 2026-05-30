@@ -83,30 +83,44 @@ KHÔNG bọc câu trả lời trong dấu ``` , KHÔNG thêm chữ giới thiệ
 
 VÍ DỤ 1 — Trắc nghiệm:
 
-[QUESTION_TYPE]: MULTIPLE_CHOICE
+[QUESTION_TYPE]: DRAG_THE_WORDS
 [SUBJECT]: Tin học
 [GRADE]: 10
 [TOPIC]: Kiểu dữ liệu Python
 [SUBTOPIC]: Kiểu dữ liệu bool
 [DIFFICULTY]: Nhận biết
 [BLOOM_LEVEL]: Remember
-[SKILL]: Nhận diện kiểu dữ liệu
+[SKILL]: Nhận diện khái niệm
 
-[QUESTION]: Trong Python, giá trị nào sau đây thuộc kiểu dữ liệu bool?
+[QUESTION]:
+______ là kiểu dữ liệu dùng để lưu giá trị đúng hoặc sai trong Python.
 
-[WORD_BANK]: N/A
+[WORD_BANK]:
+bool
+int
+str
+for
 
-[CORRECT_ANSWER]: True
+[CORRECT_ANSWER]:
+bool
 
-[DISTRACTORS]: "True" | 1 | 0.5
+[DISTRACTORS]:
+int
+str
+for
 
-[EXPLANATION]: Kiểu bool trong Python chỉ có đúng hai giá trị là True và False (viết hoa chữ cái đầu, không có dấu nháy). "True" có dấu nháy là kiểu str. 1 là int. 0.5 là float.
+[EXPLANATION]:
+Kiểu dữ liệu bool được sử dụng để biểu diễn giá trị logic True hoặc False.
 
-[KEYWORDS]: bool, True, False, kiểu dữ liệu
+[KEYWORDS]:
+Python, bool, kiểu dữ liệu, giá trị logic
 
-[GENERATION_RULES]: Phương án nhiễu cần dễ gây nhầm với bool (chuỗi "True", số 1 vốn có thể bị nhầm là True trong logic).
+[GENERATION_RULES]:
+- Ưu tiên ẩn thuật ngữ quan trọng
+- Có từ nhiễu
+- Đảm bảo ngữ nghĩa hoàn chỉnh
+- Không sinh nội dung ngoài chương trình
 
----
 
 VÍ DỤ 2 — Kéo thả từ:
 
