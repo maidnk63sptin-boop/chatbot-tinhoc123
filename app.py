@@ -136,13 +136,21 @@ def search_context(query: str, k: int = 4) -> str:
 # 3. GỌI AI SINH CÂU HỎI
 # ============================================================
 def generate_questions(topic: str, qtype: str, difficulty: str,
-                       n: int) -> str:
-    """Sinh n câu hỏi theo format chuẩn về chủ đề topic."""
-    context = search_context(topic, k=4)
+                       n: int, user_request: str = "") -> str:
+    """Sinh n câu hỏi theo format chuẩn về chủ đề topic.
+
+    user_request: phần mô tả thêm của giáo viên (yêu cầu chi tiết)
+    để AI bám theo - ví dụ: "câu hỏi gắn với ví dụ thực tế",
+    "không dùng thư viện ngoài", "đáp án có giải thích chi tiết"...
+    """
+    context = search_context(topic + " " + user_request, k=4)
     user_prompt = f"""Hãy sinh {n} câu hỏi theo format chuẩn.
 - Loại câu hỏi: {qtype}
 - Mức độ: {difficulty}
 - Chủ đề: {topic}
+
+[YÊU CẦU CHI TIẾT TỪ GIÁO VIÊN]:
+{user_request if user_request.strip() else '(không có yêu cầu thêm)'}
 
 [TÀI LIỆU THAM KHẢO]:
 {context if context else '(không có, dùng kiến thức của bạn)'}
@@ -181,11 +189,23 @@ with col2:
     topic = st.text_input("Chủ đề", "Kiểu dữ liệu Python")
     n = st.number_input("Số câu cần sinh", min_value=1, max_value=20, value=1)
 
+user_request = st.text_area(
+    "✏️ Yêu cầu chi tiết (tùy chọn)",
+    placeholder=(
+        "Mô tả thêm để AI bám sát ý bạn. Ví dụ:\n"
+        "- Câu hỏi gắn với ví dụ thực tế trong đời sống.\n"
+        "- Tập trung vào lệnh print() và input().\n"
+        "- Đáp án phải có lời giải thích chi tiết, dễ hiểu cho HS yếu.\n"
+        "- Tránh dùng thư viện ngoài, chỉ Python thuần."
+    ),
+    height=120,
+)
+
 if st.button("✍️ Sinh câu hỏi", type="primary", use_container_width=True):
     with st.spinner(f"AI đang sinh {n} câu hỏi..."):
         try:
             st.session_state.result = generate_questions(
-                topic, qtype, difficulty, int(n)
+                topic, qtype, difficulty, int(n), user_request
             )
         except Exception as e:
             st.error(f"Lỗi khi sinh câu hỏi: {e}")
