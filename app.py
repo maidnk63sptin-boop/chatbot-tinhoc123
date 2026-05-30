@@ -1,13 +1,13 @@
 """
 app.py
 ------------------------------------------------------------
-Trợ lý AI Tin học 10 (RAG) - sinh câu hỏi theo FORMAT CHUẨN.
+Trợ lý AI Tin học 10 (RAG).
 
-Chatbot trả lời theo đúng template có cấu trúc ([QUESTION_TYPE],
-[SUBJECT], [BLOOM_LEVEL]...). Có thể sinh 1 hoặc nhiều câu, và
-tải kết quả ra file .txt.
+Giao diện CHAT TỰ DO như bản gốc. Nhưng khi giáo viên yêu cầu
+SINH CÂU HỎI / BÀI TẬP, AI sẽ trả lời theo FORMAT CHUẨN 15 trường
+(QUESTION_TYPE, SUBJECT, ... GENERATION_RULES).
 
-Dùng google-genai + faiss (index build sẵn trong faiss_index/).
+Để AI bám format, system instruction có sẵn 2 ví dụ mẫu (few-shot).
 ------------------------------------------------------------
 """
 import os
@@ -20,7 +20,7 @@ from google import genai
 from google.genai import types
 
 # ============================================================
-# 0. CẤU HÌNH
+# 0. CẤU HÌNH TRANG
 # ============================================================
 st.set_page_config(page_title="Trợ lý AI Tin học 10", page_icon="🤖")
 
@@ -32,68 +32,126 @@ CHUNKS_FILE = os.path.join(INDEX_DIR, "chunks.pkl")
 EMBED_MODEL = "gemini-embedding-001"
 CHAT_MODEL = "gemini-2.5-flash-lite"
 
+# ============================================================
+# 1. API KEY
+# ============================================================
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
-    st.error("❌ Không tìm thấy GEMINI_API_KEY. Hãy thêm biến môi trường này.")
+    st.error(
+        "❌ Không tìm thấy GEMINI_API_KEY.\n\n"
+        "Trên Render: vào tab **Environment** thêm biến này.\n"
+        "Ở máy local: đặt biến môi trường hoặc dùng file .env."
+    )
     st.stop()
 
 client = genai.Client(api_key=api_key)
 
 # ============================================================
-# 1. FORMAT CHUẨN + HƯỚNG DẪN CHO AI
+# 1b. SYSTEM INSTRUCTION — yêu cầu trả lời theo cấu trúc
 # ============================================================
-# Template mẫu mà AI phải tuân theo cho MỖI câu hỏi.
-TEMPLATE = """[QUESTION_TYPE]:
-[SUBJECT]:
-[GRADE]:
-[TOPIC]:
-[SUBTOPIC]:
-[DIFFICULTY]:
-[BLOOM_LEVEL]:
-[SKILL]:
+SYSTEM_INSTRUCTION = """Bạn là một chuyên gia giáo dục và là trợ lý ảo dành riêng cho giáo viên giảng dạy môn Tin học lớp 10 tại Việt Nam, bám sát chương trình Giáo dục phổ thông 2018 (SGK Kết nối tri thức với cuộc sống và Cánh diều).
 
-[QUESTION]:
+Nhiệm vụ của bạn:
+1. Hỗ trợ soạn giáo án.
+2. Thiết kế bài tập Python.
+3. Giải thích kiến thức Tin học lớp 10.
+4. Tạo đề kiểm tra, trắc nghiệm, tự luận.
 
-[WORD_BANK]:
+QUY TẮC CHUNG:
+- Chỉ trả lời các câu hỏi liên quan đến môn Tin học lớp 10.
+- Dựa vào ngữ cảnh (Context) được cung cấp để trả lời. Nếu ngữ cảnh không đủ, hãy dùng kiến thức chuyên môn của bạn để bổ sung.
+- Nếu câu hỏi không liên quan, hãy từ chối trả lời và thông báo: "Tôi chỉ hỗ trợ các nội dung thuộc Tin học lớp 10."
 
-[CORRECT_ANSWER]:
+QUY TẮC ĐẶC BIỆT — KHI GIÁO VIÊN YÊU CẦU SINH CÂU HỎI / BÀI TẬP / TRẮC NGHIỆM:
+Hãy trả lời theo ĐÚNG FORMAT CHUẨN dưới đây. Mỗi câu hỏi là MỘT khối đầy đủ 15 trường.
+Nếu sinh nhiều câu, ngăn cách các câu bằng một dòng chứa đúng dấu: ---
 
-[DISTRACTORS]:
+Quy ước giá trị:
+- [QUESTION_TYPE]: DRAG_THE_WORDS | MULTIPLE_CHOICE | TRUE_FALSE | MATCHING
+- [SUBJECT]: Tin học
+- [GRADE]: 10
+- [DIFFICULTY]: Nhận biết | Thông hiểu | Vận dụng | Vận dụng cao
+- [BLOOM_LEVEL]: Remember | Understand | Apply | Analyze
+- [WORD_BANK]: chỉ dùng cho DRAG_THE_WORDS (các từ để kéo thả, ngăn bằng dấu phẩy). Các loại khác ghi: N/A
+- [DISTRACTORS]: phương án sai (cho MULTIPLE_CHOICE). Các loại khác ghi: N/A
+- [KEYWORDS]: vài từ khóa, ngăn bằng dấu phẩy
+- [GENERATION_RULES]: quy tắc/ràng buộc khi sinh câu này
 
-[EXPLANATION]:
+KHÔNG bọc câu trả lời trong dấu ``` , KHÔNG thêm chữ giới thiệu trước/sau khối format.
 
-[KEYWORDS]:
+===== HAI VÍ DỤ MẪU =====
 
-[GENERATION_RULES]:"""
+VÍ DỤ 1 — Trắc nghiệm:
 
-SYSTEM_INSTRUCTION = f"""Bạn là trợ lý ảo cho giáo viên Tin học lớp 10 tại Việt Nam, bám sát Chương trình GDPT 2018 (SGK Kết nối tri thức và Cánh diều).
+[QUESTION_TYPE]: MULTIPLE_CHOICE
+[SUBJECT]: Tin học
+[GRADE]: 10
+[TOPIC]: Kiểu dữ liệu Python
+[SUBTOPIC]: Kiểu dữ liệu bool
+[DIFFICULTY]: Nhận biết
+[BLOOM_LEVEL]: Remember
+[SKILL]: Nhận diện kiểu dữ liệu
 
-NHIỆM VỤ DUY NHẤT: sinh dữ liệu câu hỏi theo ĐÚNG FORMAT CHUẨN dưới đây. Mỗi câu hỏi là MỘT khối theo template:
+[QUESTION]: Trong Python, giá trị nào sau đây thuộc kiểu dữ liệu bool?
 
-{TEMPLATE}
+[WORD_BANK]: N/A
 
-QUY TẮC BẮT BUỘC:
-- LUÔN trả lời theo đúng format trên, điền đầy đủ mọi trường. KHÔNG thêm chữ giới thiệu, KHÔNG dùng markdown, KHÔNG bọc trong dấu ```.
-- Nếu sinh NHIỀU câu, mỗi câu là một khối riêng, ngăn cách nhau bằng một dòng chứa đúng: ---
-- Quy ước giá trị:
-  + QUESTION_TYPE: DRAG_THE_WORDS | MULTIPLE_CHOICE | TRUE_FALSE | MATCHING
-  + SUBJECT: Tin học
-  + GRADE: 10
-  + DIFFICULTY: Nhận biết | Thông hiểu | Vận dụng | Vận dụng cao
-  + BLOOM_LEVEL: Remember | Understand | Apply | Analyze
-- WORD_BANK chỉ dùng cho DRAG_THE_WORDS (các từ để kéo thả). DISTRACTORS là các phương án sai (cho MULTIPLE_CHOICE).
-- KEYWORDS: vài từ khóa, ngăn cách bằng dấu phẩy.
-- GENERATION_RULES: ghi ngắn gọn quy tắc/ràng buộc khi sinh câu này.
-- Chỉ làm về Tin học lớp 10. Nếu yêu cầu không liên quan, trả lời đúng một dòng: "Tôi chỉ hỗ trợ nội dung Tin học lớp 10."
-- Dựa vào tài liệu tham khảo (nếu có) để câu hỏi bám sát SGK.
+[CORRECT_ANSWER]: True
+
+[DISTRACTORS]: "True" | 1 | 0.5
+
+[EXPLANATION]: Kiểu bool trong Python chỉ có đúng hai giá trị là True và False (viết hoa chữ cái đầu, không có dấu nháy). "True" có dấu nháy là kiểu str. 1 là int. 0.5 là float.
+
+[KEYWORDS]: bool, True, False, kiểu dữ liệu
+
+[GENERATION_RULES]: Phương án nhiễu cần dễ gây nhầm với bool (chuỗi "True", số 1 vốn có thể bị nhầm là True trong logic).
+
+---
+
+VÍ DỤ 2 — Kéo thả từ:
+
+[QUESTION_TYPE]: DRAG_THE_WORDS
+[SUBJECT]: Tin học
+[GRADE]: 10
+[TOPIC]: Câu lệnh điều kiện
+[SUBTOPIC]: Cú pháp if-else
+[DIFFICULTY]: Thông hiểu
+[BLOOM_LEVEL]: Understand
+[SKILL]: Hoàn thiện cú pháp câu lệnh
+
+[QUESTION]: Hãy kéo các từ thích hợp vào chỗ trống để hoàn thiện đoạn mã kiểm tra một số có phải số chẵn không:
+___ n % 2 == 0:
+    print("Số chẵn")
+___:
+    print("Số lẻ")
+
+[WORD_BANK]: if, else, elif, then
+
+[CORRECT_ANSWER]: if, else
+
+[DISTRACTORS]: N/A
+
+[EXPLANATION]: Trong Python, câu lệnh điều kiện bắt đầu bằng "if" theo sau là biểu thức và dấu hai chấm. Khi điều kiện sai, dùng "else" (không có biểu thức). "then" không tồn tại trong Python (đó là từ khóa của Pascal).
+
+[KEYWORDS]: if, else, điều kiện, chia hết
+
+[GENERATION_RULES]: Word bank cần có ít nhất 1 từ gây nhiễu (then) để kiểm tra học sinh có phân biệt được cú pháp Python với ngôn ngữ khác.
+
+===== HẾT VÍ DỤ =====
+
+Khi sinh câu hỏi, hãy bám sát phong cách hai ví dụ trên: đầy đủ 15 trường, mỗi trường có nội dung cụ thể, EXPLANATION viết rõ ràng để giáo viên dùng làm đáp án giảng giải.
 """
 
 
 # ============================================================
-# 2. NẠP FAISS INDEX
+# 2. NẠP FAISS INDEX (có cache)
 # ============================================================
 @st.cache_resource(show_spinner=False)
 def load_index():
+    """
+    Nạp FAISS index + danh sách đoạn văn bản đã build sẵn.
+    Trả về (index, chunks) hoặc (None, None) nếu chưa có.
+    """
     if not (os.path.exists(INDEX_FILE) and os.path.exists(CHUNKS_FILE)):
         return None, None
     try:
@@ -106,26 +164,35 @@ def load_index():
         return None, None
 
 
-faiss_index, doc_chunks = load_index()
+with st.spinner("Đang nạp dữ liệu tài liệu (RAG)..."):
+    faiss_index, doc_chunks = load_index()
 
 if faiss_index is None:
     st.warning(
-        "⚠️ Chưa có dữ liệu RAG (thiếu `faiss_index/`). Vẫn dùng được "
-        "nhưng chỉ dựa vào kiến thức chung của AI."
+        "⚠️ Chưa có dữ liệu RAG (thiếu thư mục `faiss_index/`). "
+        "App vẫn chạy được nhưng chỉ dùng kiến thức chung của AI. "
+        "Hãy chạy `build_index.py` và commit thư mục `faiss_index/`."
     )
 
 
 def search_context(query: str, k: int = 4) -> str:
+    """Tìm k đoạn tài liệu liên quan nhất tới câu hỏi."""
     if faiss_index is None:
         return ""
     try:
         result = client.models.embed_content(
-            model=EMBED_MODEL, contents=query,
+            model=EMBED_MODEL,
+            contents=query,
             config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
         )
         q_vec = np.array([result.embeddings[0].values], dtype="float32")
-        _, indices = faiss_index.search(q_vec, k)
-        parts = [doc_chunks[i] for i in indices[0] if 0 <= i < len(doc_chunks)]
+        distances, indices = faiss_index.search(q_vec, k)
+        parts = []
+        for idx in indices[0]:
+            if 0 <= idx < len(doc_chunks):
+                parts.append(
+                    f"--- Trích đoạn tài liệu ---\n{doc_chunks[idx]}"
+                )
         return "\n\n".join(parts)
     except Exception as e:
         st.warning(f"⚠️ Lỗi tìm kiếm RAG: {e}")
@@ -133,31 +200,89 @@ def search_context(query: str, k: int = 4) -> str:
 
 
 # ============================================================
-# 3. GỌI AI SINH CÂU HỎI
+# 3. QUẢN LÝ TRẠNG THÁI SESSION
 # ============================================================
-def generate_questions(topic: str, qtype: str, difficulty: str,
-                       n: int, user_request: str = "") -> str:
-    """Sinh n câu hỏi theo format chuẩn về chủ đề topic.
+if "all_chats" not in st.session_state:
+    st.session_state.all_chats = {"Cuộc trò chuyện 1": []}
 
-    user_request: phần mô tả thêm của giáo viên (yêu cầu chi tiết)
-    để AI bám theo - ví dụ: "câu hỏi gắn với ví dụ thực tế",
-    "không dùng thư viện ngoài", "đáp án có giải thích chi tiết"...
-    """
-    context = search_context(topic + " " + user_request, k=4)
-    user_prompt = f"""Hãy sinh {n} câu hỏi theo format chuẩn.
-- Loại câu hỏi: {qtype}
-- Mức độ: {difficulty}
-- Chủ đề: {topic}
+if "current_chat" not in st.session_state:
+    st.session_state.current_chat = "Cuộc trò chuyện 1"
 
-[YÊU CẦU CHI TIẾT TỪ GIÁO VIÊN]:
-{user_request if user_request.strip() else '(không có yêu cầu thêm)'}
 
-[TÀI LIỆU THAM KHẢO]:
-{context if context else '(không có, dùng kiến thức của bạn)'}
+def get_history():
+    return st.session_state.all_chats[st.session_state.current_chat]
+
+
+# ============================================================
+# 4. SIDEBAR
+# ============================================================
+with st.sidebar:
+    st.title("📁 Quản lý trò chuyện")
+
+    if st.button("➕ Cuộc trò chuyện mới", use_container_width=True):
+        idx = len(st.session_state.all_chats) + 1
+        new_name = f"Cuộc trò chuyện {idx}"
+        st.session_state.all_chats[new_name] = []
+        st.session_state.current_chat = new_name
+        st.rerun()
+
+    st.divider()
+    st.write("🕒 *Lịch sử trò chuyện:*")
+
+    for chat_name in list(st.session_state.all_chats.keys()):
+        is_active = chat_name == st.session_state.current_chat
+        if st.button(
+            chat_name, disabled=is_active, use_container_width=True
+        ):
+            st.session_state.current_chat = chat_name
+            st.rerun()
+
+
+# ============================================================
+# 5. GIAO DIỆN CHÍNH
+# ============================================================
+st.title("🤖 Trợ lý AI Tin học 10 (Hỗ trợ RAG)")
+st.caption(f"Đang hiển thị: {st.session_state.current_chat}")
+
+history = get_history()
+
+# Hiển thị lịch sử
+for msg in history:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+
+def build_augmented_prompt(user_prompt: str) -> str:
+    """Tìm ngữ cảnh từ FAISS và ghép vào prompt."""
+    context_text = search_context(user_prompt, k=4)
+    if not context_text:
+        return user_prompt
+    return f"""Dựa vào các THÔNG TIN TỪ TÀI LIỆU DƯỚI ĐÂY để trả lời câu hỏi của người dùng.
+Nếu thông tin tài liệu không đủ, hãy dựa vào kiến thức của bạn.
+
+[THÔNG TIN TỪ TÀI LIỆU (Giáo án, SGK Tin 10, Thang đo Bloom)]:
+{context_text}
+
+[CÂU HỎI CỦA NGƯỜI DÙNG]:
+{user_prompt}
 """
+
+
+def call_gemini(history_msgs, augmented_prompt):
+    """Gọi Gemini với toàn bộ lịch sử (SDK mới)."""
+    contents = []
+    for m in history_msgs[:-1]:  # tất cả trừ tin nhắn user cuối cùng
+        role = "user" if m["role"] == "user" else "model"
+        contents.append(
+            types.Content(role=role, parts=[types.Part(text=m["content"])])
+        )
+    contents.append(
+        types.Content(role="user", parts=[types.Part(text=augmented_prompt)])
+    )
+
     response = client.models.generate_content(
         model=CHAT_MODEL,
-        contents=user_prompt,
+        contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION
         ),
@@ -165,62 +290,20 @@ def generate_questions(topic: str, qtype: str, difficulty: str,
     return response.text
 
 
-# ============================================================
-# 4. GIAO DIỆN
-# ============================================================
-st.title("🤖 Sinh câu hỏi Tin học 10 (Format chuẩn)")
-st.caption("AI sinh câu hỏi theo format có cấu trúc, tải về file .txt.")
+# Xử lý input mới
+if prompt := st.chat_input("Hỏi về giáo án, bài tập, SGK..."):
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    history.append({"role": "user", "content": prompt})
 
-# Lưu kết quả gần nhất trong phiên
-if "result" not in st.session_state:
-    st.session_state.result = ""
+    augmented_prompt = build_augmented_prompt(prompt)
 
-col1, col2 = st.columns(2)
-with col1:
-    qtype = st.selectbox(
-        "Loại câu hỏi",
-        ["DRAG_THE_WORDS", "MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING"],
-    )
-    difficulty = st.selectbox(
-        "Mức độ",
-        ["Nhận biết", "Thông hiểu", "Vận dụng", "Vận dụng cao"],
-    )
-with col2:
-    topic = st.text_input("Chủ đề", "Kiểu dữ liệu Python")
-    n = st.number_input("Số câu cần sinh", min_value=1, max_value=20, value=1)
+    with st.chat_message("assistant"):
+        with st.spinner("Đang suy nghĩ và tra cứu tài liệu..."):
+            try:
+                answer = call_gemini(history, augmented_prompt)
+            except Exception as e:
+                answer = f"❌ Lỗi khi gọi AI: {e}"
+            st.markdown(answer)
 
-user_request = st.text_area(
-    "✏️ Yêu cầu chi tiết (tùy chọn)",
-    placeholder=(
-        "Mô tả thêm để AI bám sát ý bạn. Ví dụ:\n"
-        "- Câu hỏi gắn với ví dụ thực tế trong đời sống.\n"
-        "- Tập trung vào lệnh print() và input().\n"
-        "- Đáp án phải có lời giải thích chi tiết, dễ hiểu cho HS yếu.\n"
-        "- Tránh dùng thư viện ngoài, chỉ Python thuần."
-    ),
-    height=120,
-)
-
-if st.button("✍️ Sinh câu hỏi", type="primary", use_container_width=True):
-    with st.spinner(f"AI đang sinh {n} câu hỏi..."):
-        try:
-            st.session_state.result = generate_questions(
-                topic, qtype, difficulty, int(n), user_request
-            )
-        except Exception as e:
-            st.error(f"Lỗi khi sinh câu hỏi: {e}")
-            st.session_state.result = ""
-
-# Hiển thị + cho tải về
-if st.session_state.result:
-    st.divider()
-    st.text_area("Kết quả (có thể chỉnh sửa)",
-                 st.session_state.result, height=400, key="result_edit")
-    final = st.session_state.get("result_edit", st.session_state.result)
-    st.download_button(
-        "⬇️ Tải file .txt",
-        data=final.encode("utf-8"),
-        file_name="cau_hoi_tin_hoc_10.txt",
-        mime="text/plain",
-        use_container_width=True,
-    )
+    history.append({"role": "assistant", "content": answer})
