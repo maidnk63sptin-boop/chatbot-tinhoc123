@@ -81,7 +81,7 @@ KHÔNG bọc câu trả lời trong dấu ``` , KHÔNG thêm chữ giới thiệ
 
 ===== HAI VÍ DỤ MẪU =====
 
-VÍ DỤ 1 — Trắc nghiệm:
+VÍ DỤ 1 — Kéo thả từ:
 
 [QUESTION_TYPE]: DRAG_THE_WORDS
 [SUBJECT]: Tin học
@@ -108,9 +108,6 @@ bool
 int
 str
 for
-
-[EXPLANATION]:
-Kiểu dữ liệu bool được sử dụng để biểu diễn giá trị logic True hoặc False.
 
 [KEYWORDS]:
 Python, bool, kiểu dữ liệu, giá trị logic
@@ -145,7 +142,6 @@ ___:
 
 [DISTRACTORS]: N/A
 
-[EXPLANATION]: Trong Python, câu lệnh điều kiện bắt đầu bằng "if" theo sau là biểu thức và dấu hai chấm. Khi điều kiện sai, dùng "else" (không có biểu thức). "then" không tồn tại trong Python (đó là từ khóa của Pascal).
 
 [KEYWORDS]: if, else, điều kiện, chia hết
 
