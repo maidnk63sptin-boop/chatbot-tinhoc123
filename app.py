@@ -83,7 +83,7 @@ KHÔNG bọc câu trả lời trong dấu ``` , KHÔNG thêm chữ giới thiệ
 
 VÍ DỤ 1 — Kéo thả từ:
 
-[QUESTION_TYPE]: DRAG_THE_WORDS
+[QUESTION_TYPE]: DRAG_THE_WORDS 
 [SUBJECT]: Tin học
 [GRADE]: 10
 [TOPIC]: Kiểu dữ liệu Python
