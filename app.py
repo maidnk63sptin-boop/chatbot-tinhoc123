@@ -71,7 +71,7 @@ Quy ước giá trị:
 - [SUBJECT]: Tin học
 - [GRADE]: 10
 - [DIFFICULTY]: Nhận biết | Thông hiểu | Vận dụng | Vận dụng cao
-- [BLOOM_LEVEL]: Remember | Understand | Apply | Analyze
+- [BLOOM_LEVEL]: Remembering | Understand | Apply | Analyze | Evaluate | Create
 - [WORD_BANK]: chỉ dùng cho DRAG_THE_WORDS (các từ để kéo thả, ngăn bằng dấu phẩy). Các loại khác ghi: N/A
 - [DISTRACTORS]: phương án sai (cho MULTIPLE_CHOICE). Các loại khác ghi: N/A
 - [KEYWORDS]: vài từ khóa, ngăn bằng dấu phẩy
