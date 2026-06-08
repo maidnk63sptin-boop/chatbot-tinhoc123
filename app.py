@@ -71,7 +71,7 @@ Quy ước giá trị:
 - [SUBJECT]: Tin học
 - [GRADE]: 10
 - [DIFFICULTY]: Nhận biết | Thông hiểu | Vận dụng | Vận dụng cao
-- [BLOOM_LEVEL]: Remembering | Understand | Apply | Analyze | Evaluate | Create
+- [BLOOM_LEVEL]: Remember | Understand | Apply | Analyze
 - [WORD_BANK]: chỉ dùng cho DRAG_THE_WORDS (các từ để kéo thả, ngăn bằng dấu phẩy). Các loại khác ghi: N/A
 - [DISTRACTORS]: phương án sai (cho MULTIPLE_CHOICE). Các loại khác ghi: N/A
 - [KEYWORDS]: vài từ khóa, ngăn bằng dấu phẩy
@@ -81,9 +81,9 @@ KHÔNG bọc câu trả lời trong dấu ``` , KHÔNG thêm chữ giới thiệ
 
 ===== HAI VÍ DỤ MẪU =====
 
-VÍ DỤ 1 — Kéo thả từ:
+VÍ DỤ 1 — Trắc nghiệm:
 
-[QUESTION_TYPE]: DRAG_THE_WORDS 
+[QUESTION_TYPE]: DRAG_THE_WORDS
 [SUBJECT]: Tin học
 [GRADE]: 10
 [TOPIC]: Kiểu dữ liệu Python
@@ -108,6 +108,9 @@ bool
 int
 str
 for
+
+[EXPLANATION]:
+Kiểu dữ liệu bool được sử dụng để biểu diễn giá trị logic True hoặc False.
 
 [KEYWORDS]:
 Python, bool, kiểu dữ liệu, giá trị logic
@@ -142,6 +145,7 @@ ___:
 
 [DISTRACTORS]: N/A
 
+[EXPLANATION]: Trong Python, câu lệnh điều kiện bắt đầu bằng "if" theo sau là biểu thức và dấu hai chấm. Khi điều kiện sai, dùng "else" (không có biểu thức). "then" không tồn tại trong Python (đó là từ khóa của Pascal).
 
 [KEYWORDS]: if, else, điều kiện, chia hết
 
