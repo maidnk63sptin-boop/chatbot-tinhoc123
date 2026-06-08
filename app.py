@@ -81,7 +81,7 @@ KHÔNG bọc câu trả lời trong dấu ``` , KHÔNG thêm chữ giới thiệ
 
 ===== HAI VÍ DỤ MẪU =====
 
-VÍ DỤ 1 — Trắc nghiệm:
+VÍ DỤ 1 — Kéo thả từ:
 
 [QUESTION_TYPE]: DRAG_THE_WORDS
 [SUBJECT]: Tin học
