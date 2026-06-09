@@ -81,46 +81,32 @@ KHÔNG bọc câu trả lời trong dấu ``` , KHÔNG thêm chữ giới thiệ
 
 ===== HAI VÍ DỤ MẪU =====
 
-VÍ DỤ 1 — Kéo thả từ:
+VÍ DỤ 1 — Trắc nghiệm:
 
-[QUESTION_TYPE]: DRAG_THE_WORDS
+[QUESTION_TYPE]: MULTIPLE_CHOICE
 [SUBJECT]: Tin học
 [GRADE]: 10
 [TOPIC]: Kiểu dữ liệu Python
 [SUBTOPIC]: Kiểu dữ liệu bool
 [DIFFICULTY]: Nhận biết
 [BLOOM_LEVEL]: Remember
-[SKILL]: Nhận diện khái niệm
+[SKILL]: Nhận diện kiểu dữ liệu
 
-[QUESTION]:
-______ là kiểu dữ liệu dùng để lưu giá trị đúng hoặc sai trong Python.
+[QUESTION]: Trong Python, giá trị nào sau đây thuộc kiểu dữ liệu bool?
 
-[WORD_BANK]:
-bool
-int
-str
-for
+[WORD_BANK]: N/A
 
-[CORRECT_ANSWER]:
-bool
+[CORRECT_ANSWER]: True
 
-[DISTRACTORS]:
-int
-str
-for
+[DISTRACTORS]: "True" | 1 | 0.5
 
-[EXPLANATION]:
-Kiểu dữ liệu bool được sử dụng để biểu diễn giá trị logic True hoặc False.
+[EXPLANATION]: Kiểu bool trong Python chỉ có đúng hai giá trị là True và False (viết hoa chữ cái đầu, không có dấu nháy). "True" có dấu nháy là kiểu str. 1 là int. 0.5 là float.
 
-[KEYWORDS]:
-Python, bool, kiểu dữ liệu, giá trị logic
+[KEYWORDS]: bool, True, False, kiểu dữ liệu
 
-[GENERATION_RULES]:
-- Ưu tiên ẩn thuật ngữ quan trọng
-- Có từ nhiễu
-- Đảm bảo ngữ nghĩa hoàn chỉnh
-- Không sinh nội dung ngoài chương trình
+[GENERATION_RULES]: Phương án nhiễu cần dễ gây nhầm với bool (chuỗi "True", số 1 vốn có thể bị nhầm là True trong logic).
 
+---
 
 VÍ DỤ 2 — Kéo thả từ:
 
@@ -222,6 +208,10 @@ if "all_chats" not in st.session_state:
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = "Cuộc trò chuyện 1"
 
+# Lưu câu trả lời AI gần nhất để cho phép tải về file .txt
+if "last_answer" not in st.session_state:
+    st.session_state.last_answer = ""
+
 
 def get_history():
     return st.session_state.all_chats[st.session_state.current_chat]
@@ -321,3 +311,17 @@ if prompt := st.chat_input("Hỏi về giáo án, bài tập, SGK..."):
             st.markdown(answer)
 
     history.append({"role": "assistant", "content": answer})
+    st.session_state.last_answer = answer
+
+
+# ============================================================
+# 6. NÚT TẢI CÂU TRẢ LỜI GẦN NHẤT VỀ FILE .TXT
+# ============================================================
+if st.session_state.last_answer:
+    st.download_button(
+        "⬇️ Tải câu trả lời gần nhất (.txt)",
+        data=st.session_state.last_answer.encode("utf-8"),
+        file_name="ket_qua_tin_hoc_10.txt",
+        mime="text/plain",
+        use_container_width=True,
+    )
