@@ -3,9 +3,7 @@ app.py
 ------------------------------------------------------------
 Trợ lý AI Tin học 10 (RAG).
 
-Giao diện CHAT TỰ DO như bản gốc. Nhưng khi giáo viên yêu cầu
-SINH CÂU HỎI / BÀI TẬP, AI sẽ trả lời theo FORMAT CHUẨN 15 trường
-(QUESTION_TYPE, SUBJECT, ... GENERATION_RULES).
+💬 Giao diện hỗ trợ CHAT TỰ DO như chatbot thông thường. Đối với các yêu cầu trao đổi thông tin thông thường, AI sẽ phản hồi tự nhiên theo ngữ cảnh hội thoại. Riêng khi giáo viên yêu cầu SINH CÂU HỎI / BÀI TẬP (ví dụ dạng kéo thả), hệ thống sẽ tự động trả kết quả theo FORMAT CHUẨN gồm 15 trường (QUESTION_TYPE, SUBJECT, …, GENERATION_RULES).
 
 Để AI bám format, system instruction có sẵn 2 ví dụ mẫu (few-shot).
 ------------------------------------------------------------
@@ -81,32 +79,38 @@ KHÔNG bọc câu trả lời trong dấu ``` , KHÔNG thêm chữ giới thiệ
 
 ===== HAI VÍ DỤ MẪU =====
 
-VÍ DỤ 1 — Trắc nghiệm:
+VÍ DỤ 1 — Kéo thả từ:
 
-[QUESTION_TYPE]: MULTIPLE_CHOICE
+[QUESTION_TYPE]: DRAG_THE_WORDS  
 [SUBJECT]: Tin học
 [GRADE]: 10
 [TOPIC]: Kiểu dữ liệu Python
 [SUBTOPIC]: Kiểu dữ liệu bool
 [DIFFICULTY]: Nhận biết
 [BLOOM_LEVEL]: Remember
-[SKILL]: Nhận diện kiểu dữ liệu
+[SKILL]: Nhận diện khái niệm
 
-[QUESTION]: Trong Python, giá trị nào sau đây thuộc kiểu dữ liệu bool?
+[QUESTION]: ______ là kiểu dữ liệu dùng để lưu giá trị đúng hoặc sai trong Python.
 
-[WORD_BANK]: N/A
+[WORD_BANK]: 
+bool
+int
+str
+for
 
-[CORRECT_ANSWER]: True
+[CORRECT_ANSWER]: bool
 
-[DISTRACTORS]: "True" | 1 | 0.5
+[DISTRACTORS]: N/A
 
 [EXPLANATION]: Kiểu bool trong Python chỉ có đúng hai giá trị là True và False (viết hoa chữ cái đầu, không có dấu nháy). "True" có dấu nháy là kiểu str. 1 là int. 0.5 là float.
 
-[KEYWORDS]: bool, True, False, kiểu dữ liệu
+[KEYWORDS]: Python, bool, kiểu dữ liệu, giá trị logic
 
-[GENERATION_RULES]: Phương án nhiễu cần dễ gây nhầm với bool (chuỗi "True", số 1 vốn có thể bị nhầm là True trong logic).
-
----
+[GENERATION_RULES]: 
+- Ưu tiên ẩn thuật ngữ quan trọng
+- Có từ nhiễu
+- Đảm bảo ngữ nghĩa hoàn chỉnh
+- Không sinh nội dung ngoài chương trình
 
 VÍ DỤ 2 — Kéo thả từ:
 
